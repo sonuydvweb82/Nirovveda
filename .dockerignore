@@ -1,0 +1,22 @@
+# Keep the backend image lean and avoid leaking secrets.
+# Build context is the repo root (see backend/Dockerfile).
+node_modules
+backend/node_modules
+frontend/node_modules
+backend/out.log
+npm-debug.log
+*.log
+
+.git
+.gitignore
+
+# Never bake local secrets into the image (Render injects real env vars).
+.env
+backend/.env
+backend/.env.docker
+backend/.env.example
+
+# Not needed for the backend runtime image.
+frontend/
+ai-service/
+research/
