@@ -1,0 +1,456 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  PATIENT
+  HEALTH_WORKER
+  DOCTOR
+  FACILITY_ADMIN
+  SUPER_ADMIN
+}
+
+enum AppointmentStatus {
+  PENDING
+  CONFIRMED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  RESCHEDULED
+}
+
+enum QueueStatus {
+  WAITING
+  CALLED
+  IN_PROGRESS
+  COMPLETED
+  SKIPPED
+  CANCELLED
+}
+
+enum Priority {
+  LOW
+  MODERATE
+  HIGH
+  EMERGENCY
+}
+
+enum RiskLevel {
+  LOW
+  MODERATE
+  HIGH
+  EMERGENCY
+}
+
+enum ReferralStatus {
+  CREATED
+  PENDING
+  ACCEPTED
+  REJECTED
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum DiagnosticStatus {
+  REQUESTED
+  SCHEDULED
+  SAMPLE_COLLECTED
+  REPORT_READY
+  COMPLETED
+  CANCELLED
+}
+
+enum FollowUpStatus {
+  SCHEDULED
+  DUE
+  COMPLETED
+  MISSED
+  CANCELLED
+}
+
+enum ConsultationType {
+  IN_PERSON
+  TELEMEDICINE
+}
+
+model User {
+  id            String    @id @default(uuid()) @db.Uuid
+  name          String
+  email         String    @unique
+  phone         String    @unique
+  password      String
+  role          Role
+  languagePref  String    @default("en")
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  patient       Patient?
+  doctor        Doctor?
+  healthWorker  HealthWorker?
+  facilityAdmin FacilityAdmin?
+  appUser       AppUser?
+
+  notifications        Notification[]
+  bookedAppointments   Appointment[]    @relation("BookedAppointments")
+}
+
+model AppUser {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @unique @db.Uuid
+  user      User     @relation(fields: [userId], references: [id])
+  address   String?
+  village   String?
+  district  String?
+  state     String?
+  createdAt DateTime @default(now())
+}
+
+model Patient {
+  id                 String          @id @default(uuid()) @db.Uuid
+  userId             String          @unique @db.Uuid
+  user               User            @relation(fields: [userId], references: [id])
+  abhaId             String?         @unique
+  dateOfBirth        DateTime?
+  gender             String?
+  bloodGroup         String?
+  heightCm           Float?
+  weightKg           Float?
+  chronicConditions  String[]
+  allergies          String[]
+  emergencyContact   String?
+  emergencyRelation  String?
+  address            String?
+  village            String?
+  district           String?
+  state              String?
+  pincode            String?
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  medicalRecords     MedicalRecord[]
+  vitals             Vital[]
+  appointments       Appointment[]
+  prescriptions      Prescription[]
+  diagnosticTests    DiagnosticTest[]
+  referrals          Referral[]       @relation("PatientReferrals")
+  followUps          FollowUp[]
+  consultations      Consultation[]
+  queueTokens        QueueToken[]
+  emergencyAlerts    EmergencyAlert[] @relation("PatientEmergencyAlerts")
+}
+
+model Doctor {
+  id            String             @id @default(uuid()) @db.Uuid
+  userId        String             @unique @db.Uuid
+  user          User               @relation(fields: [userId], references: [id])
+  registrationNo String?           @unique
+  specialization String
+  experienceYears Int?
+  facilityId    String?            @db.Uuid
+  facility      Facility?          @relation(fields: [facilityId], references: [id])
+  createdAt     DateTime           @default(now())
+
+  appointments  Appointment[]
+  consultations Consultation[]
+  prescriptions Prescription[]
+  referrals     Referral[]         @relation("DoctorReferrals")
+  diagnosticTests DiagnosticTest[]
+  queueTokens   QueueToken[]
+}
+
+model HealthWorker {
+  id                 String        @id @default(uuid()) @db.Uuid
+  userId             String        @unique @db.Uuid
+  user               User          @relation(fields: [userId], references: [id])
+  designation        String        @default("ASHA")
+  facilityId         String?       @db.Uuid
+  facility           Facility?     @relation(fields: [facilityId], references: [id])
+  areaCovered        String?
+  createdAt          DateTime      @default(now())
+}
+
+model FacilityAdmin {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @unique @db.Uuid
+  user      User     @relation(fields: [userId], references: [id])
+  facility  Facility @relation(fields: [facilityId], references: [id])
+  facilityId String @unique @db.Uuid
+  createdAt DateTime @default(now())
+}
+
+enum FacilityType {
+  SUB_CENTRE
+  PHC
+  CHC
+  DISTRICT_HOSPITAL
+  PRIVATE_HOSPITAL
+}
+
+model Facility {
+  id             String                @id @default(uuid()) @db.Uuid
+  name           String
+  type           FacilityType
+  code           String?               @unique
+  address        String?
+  district       String
+  state          String                @default("Maharashtra")
+  latitude       Float?
+  longitude      Float?
+  services       String[]
+  isDemo         Boolean               @default(true)
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+
+  doctors        Doctor[]
+  healthWorkers  HealthWorker[]
+  admin          FacilityAdmin?
+  inventories    MedicineInventory[]
+  appointments   Appointment[]
+  queueTokens    QueueToken[]
+  referralsFrom  Referral[]            @relation("FromFacility")
+  referralsTo    Referral[]            @relation("ToFacility")
+  diagnostics    DiagnosticService[]
+  consultations  Consultation[]
+}
+
+model Appointment {
+  id                String            @id @default(uuid()) @db.Uuid
+patientId         String            @db.Uuid
+  patient           Patient           @relation(fields: [patientId], references: [id])
+  doctorId          String?           @db.Uuid
+  doctor            Doctor?           @relation(fields: [doctorId], references: [id])
+  facilityId        String            @db.Uuid
+  facility          Facility          @relation(fields: [facilityId], references: [id])
+  bookedById        String?           @db.Uuid
+  bookedBy          User?             @relation("BookedAppointments", fields: [bookedById], references: [id])
+  consultationType  ConsultationType  @default(IN_PERSON)
+  status            AppointmentStatus @default(PENDING)
+  scheduledAt       DateTime
+  reason            String?
+  slotToken         String?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  @@index([patientId, scheduledAt])
+  @@index([facilityId, scheduledAt])
+  @@index([doctorId, scheduledAt])
+
+  queueTokens QueueToken[]
+}
+
+model QueueToken {
+  id             String      @id @default(uuid()) @db.Uuid
+  tokenNumber    Int
+  patientId      String      @db.Uuid
+  patient        Patient     @relation(fields: [patientId], references: [id])
+  appointmentId  String?     @db.Uuid
+  appointment    Appointment? @relation(fields: [appointmentId], references: [id])
+  facilityId     String      @db.Uuid
+  facility       Facility    @relation(fields: [facilityId], references: [id])
+  doctorId       String?     @db.Uuid
+  doctor         Doctor?     @relation(fields: [doctorId], references: [id])
+  priority       Priority    @default(LOW)
+  status         QueueStatus @default(WAITING)
+  createdAt      DateTime    @default(now())
+
+  @@unique([facilityId, tokenNumber, createdAt])
+  @@index([facilityId, status])
+  @@index([patientId, status])
+}
+
+model MedicalRecord {
+  id          String   @id @default(uuid()) @db.Uuid
+  patientId   String   @db.Uuid
+  patient     Patient  @relation(fields: [patientId], references: [id])
+  type        String
+  title       String
+  notes       String?
+  createdById String?  @db.Uuid
+  createdAt   DateTime @default(now())
+
+  @@index([patientId, createdAt])
+}
+
+model Vital {
+  id          String   @id @default(uuid()) @db.Uuid
+  patientId   String   @db.Uuid
+  patient     Patient  @relation(fields: [patientId], references: [id])
+  recordedById String? @db.Uuid
+  temperature Float?
+  heartRate   Int?
+  bpSystolic  Int?
+  bpDiastolic Int?
+  oxygenSaturation Float?
+  respiratoryRate Int?
+  weightKg    Float?
+  heightCm    Float?
+  symptoms    String[]
+  notes       String?
+  recordedAt  DateTime @default(now())
+
+  @@index([patientId, recordedAt])
+}
+
+model Prescription {
+  id            String   @id @default(uuid()) @db.Uuid
+  patientId     String   @db.Uuid
+  patient       Patient  @relation(fields: [patientId], references: [id])
+  doctorId      String   @db.Uuid
+  doctor        Doctor   @relation(fields: [doctorId], references: [id])
+  consultationId String? @db.Uuid
+  medicines     String[] 
+  dosage        String?
+  advice        String?
+  followUpDays  Int?
+  createdAt     DateTime @default(now())
+
+  @@index([patientId, createdAt])
+}
+
+model DiagnosticTest {
+  id            String   @id @default(uuid()) @db.Uuid
+  patientId     String   @db.Uuid
+  patient       Patient  @relation(fields: [patientId], references: [id])
+  doctorId      String   @db.Uuid
+  doctor        Doctor   @relation(fields: [doctorId], references: [id])
+  facilityId    String?  @db.Uuid
+  testType      String
+  status        DiagnosticStatus @default(REQUESTED)
+  labNotes      String?
+  reportSummary String?
+  reportUrl     String?
+  requestedAt   DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([patientId, status])
+}
+
+model DiagnosticService {
+  id         String   @id @default(uuid()) @db.Uuid
+  facilityId String   @db.Uuid
+  facility   Facility @relation(fields: [facilityId], references: [id])
+  name       String
+  available  Boolean  @default(true)
+  turnaroundHours Int?
+  createdAt  DateTime @default(now())
+
+  @@unique([facilityId, name])
+}
+
+model Referral {
+  id              String         @id @default(uuid()) @db.Uuid
+  patientId       String         @db.Uuid
+  patient         Patient        @relation("PatientReferrals", fields: [patientId], references: [id], onDelete: Cascade)
+  fromFacilityId  String         @db.Uuid
+  fromFacility    Facility       @relation("FromFacility", fields: [fromFacilityId], references: [id])
+  toFacilityId    String?        @db.Uuid
+  toFacility      Facility?      @relation("ToFacility", fields: [toFacilityId], references: [id])
+  doctorId        String?        @db.Uuid
+  doctor          Doctor?        @relation("DoctorReferrals", fields: [doctorId], references: [id])
+  reason          String
+  notes           String?
+  status          ReferralStatus @default(CREATED)
+  priority        Priority       @default(MODERATE)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  @@index([patientId, status])
+  @@index([toFacilityId, status])
+  @@index([fromFacilityId, status])
+}
+
+model Medicine {
+  id            String   @id @default(uuid()) @db.Uuid
+  name          String   @unique
+  genericName   String?
+  category      String?
+  description   String?
+  createdAt     DateTime @default(now())
+
+  inventories   MedicineInventory[]
+}
+
+model MedicineInventory {
+  id         String   @id @default(uuid()) @db.Uuid
+  medicineId String   @db.Uuid
+  medicine   Medicine @relation(fields: [medicineId], references: [id])
+  facilityId String   @db.Uuid
+  facility   Facility @relation(fields: [facilityId], references: [id])
+  quantity   Int      @default(0)
+  lowStockThreshold Int @default(20)
+  updatedAt  DateTime @updatedAt
+
+  @@unique([medicineId, facilityId])
+  @@index([facilityId, quantity])
+}
+
+model FollowUp {
+  id             String         @id @default(uuid()) @db.Uuid
+  patientId      String         @db.Uuid
+  patient        Patient        @relation(fields: [patientId], references: [id])
+  doctorId       String?        @db.Uuid
+  facilityId     String?        @db.Uuid
+  scheduledFor   DateTime
+  reason         String
+  status         FollowUpStatus @default(SCHEDULED)
+  completedAt    DateTime?
+  reminderSent   Boolean        @default(false)
+  createdAt      DateTime       @default(now())
+
+  @@index([patientId, status])
+  @@index([scheduledFor, status])
+}
+
+model Notification {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid
+  user      User     @relation(fields: [userId], references: [id])
+  type      String
+  title     String
+  message   String
+  read      Boolean  @default(false)
+  link      String?
+  createdAt DateTime @default(now())
+
+  @@index([userId, read])
+}
+
+model EmergencyAlert {
+  id          String   @id @default(uuid()) @db.Uuid
+  patientId   String   @db.Uuid
+  patient     Patient  @relation("PatientEmergencyAlerts", fields: [patientId], references: [id])
+  raisedById  String?  @db.Uuid
+  alertLevel  Priority @default(HIGH)
+  location    String?
+  description String?
+  status      String   @default("ACTIVE")
+  createdAt   DateTime @default(now())
+
+  @@index([status, createdAt])
+}
+
+model Consultation {
+  id              String           @id @default(uuid()) @db.Uuid
+  patientId       String           @db.Uuid
+  patient         Patient          @relation(fields: [patientId], references: [id])
+  doctorId        String           @db.Uuid
+  doctor          Doctor           @relation(fields: [doctorId], references: [id])
+  facilityId      String?          @db.Uuid
+  facility        Facility?        @relation(fields: [facilityId], references: [id])
+  type            ConsultationType @default(IN_PERSON)
+  notes           String?
+  summary         String?
+  startedAt       DateTime         @default(now())
+  endedAt         DateTime?
+  roomId          String?
+
+  @@index([doctorId, startedAt])
+  @@index([patientId, startedAt])
+}

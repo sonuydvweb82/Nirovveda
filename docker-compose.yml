@@ -1,0 +1,45 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: nirovveda-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: nirovveda
+      POSTGRES_PASSWORD: nirovveda_dev
+      POSTGRES_DB: nirovveda
+    ports:
+      - "5432:5432"
+    volumes:
+      - nirovveda_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nirovveda -d nirovveda"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: ./backend
+    container_name: nirovveda-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://nirovveda:nirovveda_dev@postgres:5432/nirovveda?schema=public
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      JWT_EXPIRES_IN: 7d
+      PORT: 5000
+      AI_SERVICE_URL: http://ai-service:8000
+      CORS_ORIGIN: http://localhost:5173
+    ports:
+      - "5000:5000"
+
+  ai-service:
+    build: ./ai-service
+    container_name: nirovveda-ai
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+
+volumes:
+  nirovveda_pgdata:

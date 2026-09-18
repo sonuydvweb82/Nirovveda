@@ -1,0 +1,13 @@
+User-agent: *
+Allow: /
+Allow: /research
+Allow: /map
+Allow: /login
+Allow: /register
+Disallow: /app/
+Disallow: /teleconsultation/
+Disallow: /403
+Disallow: /404
+Disallow: /500
+
+Sitemap: https://nirovveda.example.com/sitemap.xml
