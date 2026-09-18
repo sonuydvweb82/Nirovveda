@@ -2,9 +2,15 @@
 # Build context: repository root (Render default).
 # Render settings: Root Directory = repo root (blank/default),
 # Dockerfile Path = backend/Dockerfile.
-FROM node:20-alpine
+# Debian (glibc) base: Prisma's debian-openssl-3.0.x engines work out of the
+# box on Render. Alpine (musl) needs libssl1.1-compat and is the cause of:
+# "Error loading shared library libssl.so.1.1" / "linux-musl not compatible".
+FROM node:20-bookworm-slim
 
 WORKDIR /app
+
+# OpenSSL is required by Prisma engines at runtime (Debian bookworm = OpenSSL 3).
+RUN apt-get update -y && apt-get install -y --no-install-recommends openssl ca-certificates && rm -rf /var/lib/apt/lists/*
 
 # Install backend deps first for better layer caching.
 # Manifest lives in backend/, so prefix paths with backend/.
